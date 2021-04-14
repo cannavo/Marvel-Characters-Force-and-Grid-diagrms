@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title></title>
+	<script src="https://d3js.org/d3.v4.min.js"></script>
+	<script src="https://d3js.org/d3-interpolate.v1.min.js"></script>
+	<script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
+	<script>
+		function load(error,data){
+			if(error){console.log(error); return 0;}
+			let size=20;
+			
+			var hash={}
+			data.edges.forEach(function(d,i){
+				hash[d.Source+"|||"+d.Target]=d.Weight;
+			});
+			var svg = d3.select("body").append("svg").attr("width",size*data.nodes.length+(10*size)).attr("height",size*data.nodes.length+(10*size));
+			let g=[]
+			let texty=[]
+			let textx=[]
+			let coords={}
+			for (var i=0;i<=data.nodes.length;i++){
+				g.push({type: "line", x1: (10*size) , y1: (10*size)+(size*i), x2: (10*size)+(size*data.nodes.length), y2:(10*size)+(size*i)});	
+				g.push({type: "line", y1: (10*size) , x1: (10*size)+(size*i), y2: (10*size)+(size*data.nodes.length), x2:(10*size)+(size*i)});	
+			}
+			data.nodes.forEach(function(d1,i){
+				texty.push({type: "text", y:(10*size)+(size*(i+1)), text: d1.Label.split("/")[0].split("[")[0], label: d1.Label});
+				textx.push({type: "text", x:(10*size)+(size*i), text: d1.Label.split("/")[0].split("[")[0], label: d1.Label});
+				coords[d1.Label]=i;
+			});
+			let rects=[]
+			for (let [rel, w] of Object.entries(hash)) {
+				rel=rel.split("|||")
+				c1=coords[rel[0]]*size+size*10
+				c2=coords[rel[1]]*size+size*10
+				rects.push({type: "rect", x: c1 , y: c2, source: rel[0] ,target: rel[1], opacity: ((w-5)/1232)+.4});
+				rects.push({type: "rect", x: c2 , y: c1, source: rel[1] ,target: rel[0], opacity: ((w-5)/1232)+.4});
+			}
+			let grid = svg.selectAll(".grid").data(g);
+			grid.enter()
+				.append("line")
+				.attr("x1",function(d){return d.x1;})
+				.attr("y1",function(d){return d.y1;})
+				.attr("x2",function(d){return d.x2;})
+				.attr("y2",function(d){return d.y2;})
+				.attr("class","grid")
+				.style("stroke","black")
+				.style("stroke-width",".4");
+			let recs = svg.selectAll(".rect").data(rects);
+			recs.enter()
+				.append("rect")
+				.attr("x",function(d){return d.x;})
+				.attr("y",function(d){return d.y;})
+				.attr("width",size)
+				.attr("height",size)
+				.attr("class","rect")
+				.style("fill","red")
+				.style("fill-opacity",function(d){return d.opacity;});
+			var clicked=(function(){
+				let prev=null;
+				let curr=null;
+				return function(d){
+					if(prev==null){
+						prev=d.label;
+						d3.selectAll(".textx")
+							.style("fill",function(da){
+								console.log(da.text+" x")
+								if(da.text==d.text){
+									return "red";
+								}
+								return "black";
+							})
+							.style("cursor",function(da){
+								if(da.text==d.text){
+									return "default";
+								}
+								return "pointer";
+							});
+						d3.selectAll(".texty")
+							.style("fill",function(da){
+								console.log(da.text+" y")
+								if(da.text==d.text){
+									return "red";
+								}
+								return "black";
+							})
+							.style("cursor",function(da){
+								if(da.text==d.text){
+									return "default";
+								}
+								return "pointer";
+							});
+					}
+					else if(d.label!=prev){
+						curr=d.label;
+						var temp=coords[prev]
+						coords[prev]=coords[curr]
+						coords[curr]=temp
+						svg.selectAll(".rect")
+							.attr("x",function(da){return coords[da.source]*size+size*10;})
+							.attr("y",function(da){return coords[da.target]*size+size*10;});
+						d3.selectAll(".texty")
+							.style("fill","black")
+							.style("cursor","pointer")
+							.attr("y",function(da){return (coords[da.label]+1)*size+size*10;});
+						d3.selectAll(".textx")
+							.style("fill","black")
+							.style("cursor","pointer")
+							.text(function(da){
+								if(da.label==prev){
+									da.label=curr;
+									da.text=curr.split("/")[0].split("[")[0];
+								}
+								else if(da.label==curr) {
+									da.label=prev;
+									da.text=prev.split("/")[0].split("[")[0];
+								}
+								return da.text;
+							});
+						prev=null;
+						curr=null;
+					}
+				}
+			})();
+			let txty = svg.selectAll(".texty").data(texty);
+			txty.enter()
+				.append("text")
+				.attr("x",0)
+				.attr("y",function(d){return d.y;})
+				.attr("font-size",size+"px")
+				.attr("class","texty")
+				.style("cursor","pointer")
+				.text(function(d){return d.text;})
+				.on("click",clicked);
+			let txtx = svg.selectAll(".textx").data(textx);
+			txtx.enter()
+				.append("text")
+				.attr("y",0)
+				.attr("x",function(d){return d.x;})
+				.attr("font-size",size+"px")
+				.attr("transform",function(d){return "rotate(90,"+d.x+",0)";})
+				.attr("class","textx")
+				.style("cursor","pointer")
+				.text(function(d){return d.text;})
+				.on("click",clicked);
+		}
+	</script>
+</head>
+<body onLoad="d3.json('edges.json',load)">
+</body>
+</html>
